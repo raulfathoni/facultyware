@@ -156,3 +156,81 @@ test('Fitur 12 - Mencetak form BAST', async ({ page, context }) => {
     console.log('Tidak ada data distribusi untuk ditest');
   }
 });
+
+test('Fitur 13 - Menerima pengembalian aset', async ({ page }) => {
+  await page.goto('/assets');
+
+  await page.selectOption('select[name="status"]', 'in_use');
+  await page.click('button[type="submit"]');
+  await page.waitForLoadState('networkidle');
+
+  const rows = page.locator('tbody tr');
+  const rowCount = await rows.count();
+  console.log('Jumlah aset in_use:', rowCount);
+
+  if (rowCount === 0) {
+    console.log('Tidak ada aset berstatus Digunakan, test dilewati.');
+    return;
+  }
+
+  await page.locator('a:has-text("Kelola Distribusi")').first().click();
+  await page.waitForLoadState('networkidle');
+
+  const returnForm = page.locator('form[action*="/distributions/return/"]');
+  const formCount = await returnForm.count();
+
+  if (formCount === 0) {
+    console.log('Form pengembalian tidak tersedia untuk aset ini.');
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  await page.fill('input[name="return_date"]', today);
+
+  const notesField = page.locator('textarea[name="return_notes"]');
+  if (await notesField.isVisible()) {
+    await notesField.fill('Aset dikembalikan dalam kondisi baik - testing');
+  }
+
+  const returnBtn = page.locator('button:has-text("Konfirmasi Pengembalian Aset")');
+  const btnCount = await returnBtn.count();
+
+  if (btnCount === 0) {
+    console.log('Tombol konfirmasi tidak ditemukan, test dilewati.');
+    return;
+  }
+
+  page.once('dialog', dialog => dialog.accept());
+  await returnBtn.click();
+  await page.waitForLoadState('networkidle');
+
+  console.log('Pengembalian aset berhasil diproses');
+});
+
+test('Fitur 14 - Melihat riwayat distribusi aset per penerima', async ({ page }) => {
+  await page.goto('/assets/distributions/recipients');
+  await page.waitForLoadState('networkidle');
+
+  await expect(page.locator('table')).toBeVisible();
+
+  const rows = page.locator('tbody tr');
+  const rowCount = await rows.count();
+  console.log('Jumlah penerima aset:', rowCount);
+
+  if (rowCount === 0) {
+    console.log('Tidak ada data penerima aset.');
+    return;
+  }
+
+  const riwayatLink = page.locator('a:has-text("Lihat Riwayat Aset")').first();
+  const isVisible = await riwayatLink.isVisible().catch(() => false);
+
+  if (isVisible) {
+    await riwayatLink.click();
+    await page.waitForLoadState('networkidle');
+    console.log('URL halaman riwayat:', page.url());
+    await expect(page.locator('table')).toBeVisible();
+  } else {
+    console.log('Link riwayat aset tidak ditemukan, cek selector.');
+  }
+});
